@@ -9,12 +9,14 @@ import {
   Upload,
   X,
 } from "lucide-react";
+import type { MonthKey } from "@/domain/commissions/entities/sale";
 import { getActiveSellerNames } from "@/domain/commissions/entities/seller";
-import { formatBrlCents } from "@/domain/commissions/services/normalizers/currency-normalizer";
 import type { DefaultCsvPayload } from "@/infrastructure/server/default-csv.loader";
 import { useCommissionWorkspace } from "../hooks/use-commission-workspace";
 import { CsvUploadModal } from "./CsvUploadModal";
+import { IndividualStatementTab } from "./IndividualStatementTab";
 import { KpiSummaryBar } from "./KpiSummaryBar";
+import { MonthlySummaryTab } from "./MonthlySummaryTab";
 import { PendingQueueTab } from "./PendingQueueTab";
 import { WorkspaceHeader } from "./WorkspaceHeader";
 
@@ -25,12 +27,20 @@ interface CommissionWorkspaceProps {
 type WorkspaceTab = "pending" | "summary" | "statement";
 
 export function CommissionWorkspace({ initialCsv }: CommissionWorkspaceProps) {
-  const { state, store } = useCommissionWorkspace(initialCsv);
+  const { state, store, services } = useCommissionWorkspace(initialCsv);
   const [activeTab, setActiveTab] = useState<WorkspaceTab>("pending");
   const [isUploadOpen, setIsUploadOpen] = useState(false);
+  const [statementSeller, setStatementSeller] = useState("");
+  const [statementMonth, setStatementMonth] = useState<MonthKey | "all">("all");
 
   const activeSellers = getActiveSellerNames(state.sellerRegistry);
   const hasResolutions = Object.keys(state.resolutions).length > 0;
+
+  const handleOpenStatement = (seller: string, month: MonthKey | "all") => {
+    setStatementSeller(seller);
+    setStatementMonth(month);
+    setActiveTab("statement");
+  };
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900">
@@ -181,41 +191,23 @@ export function CommissionWorkspace({ initialCsv }: CommissionWorkspaceProps) {
             )}
 
             {activeTab === "summary" && (
-              <section className="rounded-2xl border border-slate-200 bg-white p-8 text-center shadow-xs">
-                <BarChart3
-                  className="mx-auto h-8 w-8 text-blue-600"
-                  aria-hidden="true"
-                />
-                <h2 className="mt-3 text-base font-semibold text-slate-900">
-                  Resumo Mensal &amp; Metas (Etapa 5)
-                </h2>
-                <p className="mt-1 text-sm text-slate-500">
-                  Motor já calculando ao vivo:{" "}
-                  <strong className="font-mono text-slate-900">
-                    {formatBrlCents(state.report.grandTotalCents)}
-                  </strong>{" "}
-                  distribuídos em {state.report.months.length} mês(es). A matriz
-                  interativa e barras de meta de R$ 120k serão exibidas aqui na
-                  Etapa 5.
-                </p>
-              </section>
+              <MonthlySummaryTab
+                report={state.report}
+                onOpenStatement={handleOpenStatement}
+              />
             )}
 
             {activeTab === "statement" && (
-              <section className="rounded-2xl border border-slate-200 bg-white p-8 text-center shadow-xs">
-                <FileText
-                  className="mx-auto h-8 w-8 text-blue-600"
-                  aria-hidden="true"
-                />
-                <h2 className="mt-3 text-base font-semibold text-slate-900">
-                  Extrato Individual (Etapa 5)
-                </h2>
-                <p className="mt-1 text-sm text-slate-500">
-                  {state.report.allEntries.length} lançamento(s) computado(s) no
-                  livro-razão prontos para filtro, cópia WhatsApp e exportação
-                  CSV na Etapa 5.
-                </p>
-              </section>
+              <IndividualStatementTab
+                report={state.report}
+                selectedSeller={statementSeller}
+                selectedMonth={statementMonth}
+                onSelectSeller={setStatementSeller}
+                onSelectMonth={setStatementMonth}
+                onGoToPending={() => setActiveTab("pending")}
+                exportWhatsAppUseCase={services.exportWhatsAppUseCase}
+                exportCsvUseCase={services.exportCsvUseCase}
+              />
             )}
           </>
         )}
